@@ -14,9 +14,8 @@ The image planner considers optimal trajectories within in the image space, remo
 ## Installing 
 Within the `src` directory of a ROS2 workspace (e.g. `/colcon_ws`):
 ```shell
-git clone https://github.com/SuryaKannan/image_path_planning.git
-cd ~/colcon_ws
-rosdep install -i --from-path src --rosdistro foxy -y
+git clone https://github.com/SuryaKannan/image_path_planning.git --recurse-submodules
+cd .. && rosdep install --from-paths src --ignore-src -r -y
 colcon build
 ```
 Do not forget to source the workspace.
