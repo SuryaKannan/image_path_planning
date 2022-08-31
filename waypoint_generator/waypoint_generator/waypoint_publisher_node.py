@@ -8,7 +8,6 @@ from tf2_msgs.msg import TFMessage
 import tf2_ros as tf2
 import math 
 import numpy as np
-from tf_transformations import quaternion_multiply
 
 class WaypointPublisher(Node):
     def __init__(self):
@@ -28,8 +27,7 @@ class WaypointPublisher(Node):
         self.base_link_height = 0.0
         self.baselnk_2_camera = Transform()
         self.published = False
-        print("finished creating trajectories!")
-
+        
     def connect_endpoints(self,point1, point2):
         """
         Connect a set of two cartesian endpoints parabolically using a fixed number of sample.
@@ -74,6 +72,10 @@ class WaypointPublisher(Node):
                 waypoint.pose.position.x = self.points_array[trajectory,point,1]
                 waypoint.pose.position.y = self.points_array[trajectory,point,0]
                 waypoint.pose.position.z = self.base_link_height
+                waypoint.pose.orientation.x = 0.0
+                waypoint.pose.orientation.y = 0.0
+                waypoint.pose.orientation.z = 0.0
+                waypoint.pose.orientation.w = 1.0
                 waypoint.velocity.linear.x = 0.0
                 self.waypoints.waypoints.append(waypoint)
 
@@ -81,27 +83,14 @@ class WaypointPublisher(Node):
                 marker.header.frame_id = waypoint.frame_id
                 marker.ns = 'global_waypoint'
                 marker.id = id_count
-                marker.scale.x = 0.5
-                marker.scale.y = 0.5
-                marker.scale.z = 0.5
+                marker.scale.x = 0.25
+                marker.scale.y = 0.1
+                marker.scale.z = 0.1
                 marker.pose = waypoint.pose
                 marker.color.a = 0.5
-                marker.color.g = 1.0
+                marker.color.r = 1.0
                 self.waypoint_markers.markers.append(marker)
                 id_count+=1
-    
-    def convert_pose(self,pose):
-        """
-        Convert a pose or transform between frames using tf.
-        pose -> A geometry_msgs.msg/Pose that defines the robots position and orientation in a reference_frame
-        """
-        out_pose = Pose()
-        out_pose.position.x = pose.position.x + self.baselnk_2_camera.translation.x
-        out_pose.position.y = pose.position.y + self.baselnk_2_camera.translation.y
-        out_pose.position.z = pose.position.z + self.baselnk_2_camera.translation.z
-        out_pose.quarternion = quaternion_multiply(pose.orientation,self.baselnk_2_camera.rotation)
-
-        return out_pose
     
     def tf_received(self,msg):
         """
@@ -113,16 +102,6 @@ class WaypointPublisher(Node):
             baselnk_2_camera.rotation = msg.transforms[1].transform.rotation ## combine rotation and translation to create one tf between base_link and depth_camera
             self.baselnk_2_camera = baselnk_2_camera
             self.tf_subscriber_.destroy() ## destroy subscription after storing transformations
-            
-    
-    def set_camera_waypoints(self):
-        """
-        Convert world waypoints to camera waypoints
-        """
-        for idx, waypoint in enumerate(self.waypoints.waypoints):
-            camera_pose = self.convert_pose(waypoint.pose)
-            self.waypoints.waypoints[idx].pose = camera_pose
-            self.waypoints.waypoints[idx].frame_id = "camera_depth_link"
 
     def timer_callback(self):
         """
@@ -131,10 +110,10 @@ class WaypointPublisher(Node):
         if not self.published:
             self.generate_points()
             self.set_world_waypoints()
-            self.set_camera_waypoints()
             self.waypoints_publisher_.publish(self.waypoints)
             self.waypoints_visualiser_.publish(self.waypoint_markers)
             self.published = True
+            print("finished creating trajectories!")
         else:
             self.waypoints_publisher_.publish(self.waypoints)
             self.waypoints_visualiser_.publish(self.waypoint_markers)
