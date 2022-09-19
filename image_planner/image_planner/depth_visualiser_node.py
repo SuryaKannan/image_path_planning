@@ -37,15 +37,24 @@ class DepthVisualiser(Node):
     def depth_received(self,msg):
         depth_data = ros2_numpy.numpify(msg)
         depth_frame = np.reshape(depth_data,(self.IM_HEIGHT,self.IM_WIDTH))
-        print(self.camera_model.intrinsicMatrix())
-    
+        np.savetxt("depth.csv", depth_frame, fmt='%s')
+        
+
     def image_received(self,msg):
         current_frame = self.br.imgmsg_to_cv2(msg)
+                # Filename
+        filename = 'image.jpg'
+        
+        # Using cv2.imwrite() method
+        # Saving the image
+        print(current_frame)
+        cv2.imwrite(filename, current_frame)
     
     def info_received(self,msg):
         ## http://docs.ros.org/en/kinetic/api/image_geometry/html/python/index.html#module-image_geometry
         self.camera_model = image_geometry.PinholeCameraModel()
         self.camera_model.fromCameraInfo(msg)
+        print(self.camera_model.intrinsicMatrix())
         self.camera_info_subscriber_.destroy() ## destroy subscription after storing camera params
 
 def main(args=None):
