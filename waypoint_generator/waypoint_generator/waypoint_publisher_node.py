@@ -2,12 +2,15 @@
 import rclpy
 from rclpy.node import Node
 from planning_interfaces.msg import Waypoint, WaypointArray
+from sensor_msgs.msg import CameraInfo
 from visualization_msgs.msg import Marker, MarkerArray
-from geometry_msgs.msg import Transform, Pose
+from geometry_msgs.msg import Transform
 from tf2_msgs.msg import TFMessage
-import tf2_ros as tf2
 import math 
 import numpy as np
+import image_geometry
+import time
+import os 
 
 class WaypointPublisher(Node):
     def __init__(self):
@@ -15,19 +18,24 @@ class WaypointPublisher(Node):
         self.waypoints_publisher_ = self.create_publisher(WaypointArray,'global_waypoints',10)
         self.waypoints_visualiser_ = self.create_publisher(MarkerArray,'global_waypoint_markers',0)
         self.tf_subscriber_ = self.create_subscription(TFMessage,  "/tf_static",self.tf_received,10)
+        self.camera_info_subscriber_ = self.create_subscription(CameraInfo,"/camera/depth/camera_info",self.info_received,10)
         timer_period = 0.5
-        self.num_trajectories = 10 # number of trajectories desired
+        self.timer = self.create_timer(timer_period,self.timer_callback)
+        self.camera_model = None 
+        self.IM_HEIGHT = 480 ## see Gazebo camera definition TODO: add args parser  https://github.com/oKermorgant/simple_launch
+        self.IM_WIDTH = 640 
+        self.path = "../../params/"
+        self.num_trajectories = 15 # number of trajectories desired TODO: add args parser 
         self.sampling_points = 10 # samples per trajectory
         self.points_array = np.zeros((self.num_trajectories,self.sampling_points,3))
-        self.grid_size = (3,2) #(width, height -> y,x using robotics coordinate frame)
-        self.timer = self.create_timer(timer_period,self.timer_callback)
-        self.tfbuffer = tf2.Buffer()
+        self.grid_width = 1 ## TODO: add args parser 
+        self.grid_size = (0,0)
         self.waypoints = WaypointArray()
         self.waypoint_markers = MarkerArray()
         self.base_link_height = 0.0
         self.baselnk_2_camera = Transform()
         self.published = False
-        
+
     def connect_endpoints(self,point1, point2):
         """
         Connect a set of two cartesian endpoints parabolically using a fixed number of sample.
@@ -36,14 +44,14 @@ class WaypointPublisher(Node):
         """
         m = (point2[1] - point1[1])/(np.cosh(point2[0]) - np.cosh(point1[0]))
         c = point1[1] - m*np.cosh(point1[0])
-        x = np.linspace(point1[0], point2[0], self.sampling_points)
+        y = np.linspace(point1[0], point2[0], self.sampling_points)
 
-        if not math.isinf(m):
-            y = m*np.cosh(x) + c
+        if not math.isinf(m):  ## check if line has no gradient (i.e oriented towards x axis)
+            x = m*np.cosh(y) + c
         else:
-            y = np.linspace(point1[0], point2[0], self.sampling_points)  
+            x = np.linspace(point1[1], point2[0], self.sampling_points)  
         
-        return (x,y)
+        return (y,x)
 
     def generate_points(self):
         """
@@ -55,8 +63,8 @@ class WaypointPublisher(Node):
 
         for trajectory in range(self.num_trajectories):
             y_points,x_points = self.connect_endpoints((y_endpoints[trajectory],x_endpoints[trajectory]),np.array([0,0]))
-            z_points = np.zeros_like(y_endpoints)
-            points = np.stack((y_points,x_points,z_points), axis=-1)
+            z_points = np.zeros(self.sampling_points)
+            points = np.stack((x_points,y_points,z_points), axis=-1)
             points = np.nan_to_num(points)
             self.points_array[trajectory,:,:] = points
 
@@ -69,8 +77,8 @@ class WaypointPublisher(Node):
             for point in range(self.sampling_points):
                 waypoint = Waypoint()
                 waypoint.frame_id = 'base_link' ## this is the origin of the robot frame
-                waypoint.pose.position.x = self.points_array[trajectory,point,1]
-                waypoint.pose.position.y = self.points_array[trajectory,point,0]
+                waypoint.pose.position.x = self.points_array[trajectory,point,0]
+                waypoint.pose.position.y = self.points_array[trajectory,point,1]
                 waypoint.pose.position.z = self.base_link_height
                 waypoint.pose.orientation.x = 0.0
                 waypoint.pose.orientation.y = 0.0
@@ -103,13 +111,28 @@ class WaypointPublisher(Node):
             self.baselnk_2_camera = baselnk_2_camera
             self.tf_subscriber_.destroy() ## destroy subscription after storing transformations
 
+    def info_received(self,msg):
+        ## http://docs.ros.org/en/kinetic/api/image_geometry/html/python/index.html#module-image_geometry
+        self.camera_model = image_geometry.PinholeCameraModel()
+        self.camera_model.fromCameraInfo(msg)
+        intrinsic = self.camera_model.intrinsicMatrix()
+        np.save(os.path.join(self.path, 'intrinsic.npy'),intrinsic)
+        self.grid_size = (self.grid_width,(self.grid_width/self.IM_WIDTH)*intrinsic.flat[0]) #(width, height -> y,x using robotics coordinate frame)
+        self.camera_info_subscriber_.destroy() ## destroy subscription after storing camera params
+    
+    def save_waypoints(self):
+        stacked_waypoints = np.reshape(self.points_array,(self.points_array.shape[0]*self.points_array.shape[1],self.points_array.shape[2]))
+        np.save(os.path.join(self.path, 'waypoints.npy'),stacked_waypoints)
+
     def timer_callback(self):
         """
         Run steps for waypoint generation and publish
         """
         if not self.published:
             self.generate_points()
+            time.sleep(1)
             self.set_world_waypoints()
+            self.save_waypoints()
             self.waypoints_publisher_.publish(self.waypoints)
             self.waypoints_visualiser_.publish(self.waypoint_markers)
             self.published = True
@@ -117,7 +140,6 @@ class WaypointPublisher(Node):
         else:
             self.waypoints_publisher_.publish(self.waypoints)
             self.waypoints_visualiser_.publish(self.waypoint_markers)
-        
     
 def main(args=None):
     rclpy.init(args=args)
