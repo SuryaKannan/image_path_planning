@@ -10,7 +10,7 @@ import math
 import numpy as np
 import image_geometry
 import time
-import os 
+from waypoint_generator.utils import storage
 
 class WaypointPublisher(Node):
     def __init__(self):
@@ -24,11 +24,11 @@ class WaypointPublisher(Node):
         self.camera_model = None 
         self.IM_HEIGHT = 480 ## see Gazebo camera definition TODO: add args parser  https://github.com/oKermorgant/simple_launch
         self.IM_WIDTH = 640 
-        self.path = "../../params/"
+        self.path = "../../params"
         self.num_trajectories = 15 # number of trajectories desired TODO: add args parser 
         self.sampling_points = 10 # samples per trajectory
         self.points_array = np.zeros((self.num_trajectories,self.sampling_points,3))
-        self.grid_width = 1 ## TODO: add args parser 
+        self.grid_width = 0.85 ## TODO: add args parser 
         self.grid_size = (0,0)
         self.waypoints = WaypointArray()
         self.waypoint_markers = MarkerArray()
@@ -46,7 +46,7 @@ class WaypointPublisher(Node):
         c = point1[1] - m*np.cosh(point1[0])
         y = np.linspace(point1[0], point2[0], self.sampling_points)
 
-        if not math.isinf(m):  ## check if line has no gradient (i.e oriented towards x axis)
+        if not math.isinf(m):  ## check if line has no gradient (i.e oriented with x axis)
             x = m*np.cosh(y) + c
         else:
             x = np.linspace(point1[1], point2[0], self.sampling_points)  
@@ -57,8 +57,7 @@ class WaypointPublisher(Node):
         """
         Generate a set of cartesian trajectories based on a given grid size.
         """
-        grid_width = (np.ceil(self.grid_size[0]) // 2 ) * 2 + 1 ## round up to nearest odd number 
-        y_endpoints = np.linspace(-grid_width, grid_width, self.num_trajectories)
+        y_endpoints = np.linspace(-self.grid_size[0], self.grid_size[0], self.num_trajectories)
         x_endpoints = self.grid_size[1]*np.ones_like(y_endpoints)
 
         for trajectory in range(self.num_trajectories):
@@ -89,9 +88,10 @@ class WaypointPublisher(Node):
 
                 marker = Marker()
                 marker.header.frame_id = waypoint.frame_id
+                marker.type = 2
                 marker.ns = 'global_waypoint'
                 marker.id = id_count
-                marker.scale.x = 0.25
+                marker.scale.x = 0.1
                 marker.scale.y = 0.1
                 marker.scale.z = 0.1
                 marker.pose = waypoint.pose
@@ -112,27 +112,27 @@ class WaypointPublisher(Node):
             self.tf_subscriber_.destroy() ## destroy subscription after storing transformations
 
     def info_received(self,msg):
-        ## http://docs.ros.org/en/kinetic/api/image_geometry/html/python/index.html#module-image_geometry
-        self.camera_model = image_geometry.PinholeCameraModel()
-        self.camera_model.fromCameraInfo(msg)
-        intrinsic = self.camera_model.intrinsicMatrix()
-        np.save(os.path.join(self.path, 'intrinsic.npy'),intrinsic)
-        self.grid_size = (self.grid_width,(self.grid_width/self.IM_WIDTH)*intrinsic.flat[0]) #(width, height -> y,x using robotics coordinate frame)
+        """
+        Collect and store camera intrinsics
+        http://docs.ros.org/en/kinetic/api/image_geometry/html/python/index.html#module-image_geometry
+        """
+        camera_model = image_geometry.PinholeCameraModel()
+        camera_model.fromCameraInfo(msg)
+        storage.update_param(self.path,"intrinsic.npy",camera_model.intrinsicMatrix())
+        self.grid_size = (self.grid_width,(self.grid_width/self.IM_WIDTH)*camera_model.fx()) #(width, height -> y,x using robotics coordinate frame)
         self.camera_info_subscriber_.destroy() ## destroy subscription after storing camera params
     
-    def save_waypoints(self):
-        stacked_waypoints = np.reshape(self.points_array,(self.points_array.shape[0]*self.points_array.shape[1],self.points_array.shape[2]))
-        np.save(os.path.join(self.path, 'waypoints.npy'),stacked_waypoints)
-
     def timer_callback(self):
         """
         Run steps for waypoint generation and publish
         """
         if not self.published:
+            time.sleep(1) ## wait until camera params are stored
             self.generate_points()
-            time.sleep(1)
+            time.sleep(1) ## wait until waypoints have been generated fully 
+            print(self.points_array)
             self.set_world_waypoints()
-            self.save_waypoints()
+            storage.update_param(self.path,"waypoints.npy",self.points_array)
             self.waypoints_publisher_.publish(self.waypoints)
             self.waypoints_visualiser_.publish(self.waypoint_markers)
             self.published = True
