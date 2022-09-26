@@ -1,61 +1,91 @@
 #!/usr/bin/env python3
+from re import S
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image, PointCloud2, CameraInfo
 import numpy as np
 import ros2_numpy 
-import cv2
-from cv_bridge import CvBridge
 import image_geometry
-
+from planning_interfaces.msg import WaypointArray, WaypointInfo
+from tf2_msgs.msg import TFMessage
+from image_planner.utils import transforms
+        
 class DepthVisualiser(Node):
     def __init__(self):
         super().__init__('depth_visualiser')
-        self.depth_subscriber_ = self.create_subscription(
-            PointCloud2,  
-            "/camera/depth/color/points",
-            self.depth_received,
-            10
-        )
-        self.image_subscriber_ = self.create_subscription(
-            Image,  
-            "/camera/depth/image_rect_raw",
-            self.image_received,
-            10
-        )
-        self.camera_info_subscriber_ = self.create_subscription(
-            CameraInfo,  
-            "/camera/depth/camera_info",
-            self.info_received,
-            10
-        )
-        self.br = CvBridge()
+        self.depth_subscriber_ = self.create_subscription(PointCloud2,"/camera/depth/color/points",self.depth_received,10)
+        self.image_subscriber_ = self.create_subscription(Image,"/camera/color/image_raw",self.image_received,10) # /camera/color/image_raw, /camera/depth/image_rect_raw
+        self.tf_subscriber_ = self.create_subscription(TFMessage,"/tf_static",self.tf_received,10)
+        self.camera_info_subscriber_ = self.create_subscription(CameraInfo,"/camera/depth/camera_info",self.camera_info_received,10)
+        self.waypoint_subscriber_ = self.create_subscription(WaypointArray,"/local_waypoints",self.waypoints_received,10)
+        self.waypoint_info_subscriber_ = self.create_subscription(WaypointInfo,"/local_waypoint_info",self.waypoints_info_received,10)
+        timer_period = 1/10
+        self.timer = self.create_timer(timer_period,self.timer_callback)
+        self.points_array = None
+        self.camera_traj_pixels = None
         self.camera_model = None 
+        self.baselnk_2_camera = None
         self.IM_HEIGHT = 480
         self.IM_WIDTH = 640
-        
+        self.num_trajectories = 0
+        self.num_samples = 0
+        self.stretch = 5 #Make trajectories slightly stretch slightly further away so they appear in camera frame
+
+    def timer_callback(self):
+        if self.points_array is not None and self.baselnk_2_camera is not None and self.camera_model is not None:
+            camera_points = transforms.transform_points(self.baselnk_2_camera, self.points_array)
+            self.camera_traj_pixels = transforms.project_points(self.camera_model.intrinsicMatrix(),camera_points)
+            # self.camera_traj_pixels = np.delete(self.camera_traj_pixels, np.where((self.camera_traj_pixels[:,0] > self.IM_HEIGHT) & (self.camera_traj_pixels[:,1] > self.IM_WIDTH))[0], axis=1)
+            print(self.camera_traj_pixels.shape)
+            
+    def image_received(self,msg):
+        current_frame = ros2_numpy.numpify(msg)
+        if self.camera_traj_pixels is not None:
+            current_frame[self.camera_traj_pixels[0,:],self.camera_traj_pixels[1,:],:] = 255
+            print(current_frame)
+
     def depth_received(self,msg):
         depth_data = ros2_numpy.numpify(msg)
-        depth_frame = np.reshape(depth_data,(self.IM_HEIGHT,self.IM_WIDTH))
-        np.savetxt("depth.csv", depth_frame, fmt='%s')
-        
-
-    def image_received(self,msg):
-        current_frame = self.br.imgmsg_to_cv2(msg)
-                # Filename
-        filename = 'image.jpg'
-        
-        # Using cv2.imwrite() method
-        # Saving the image
-        print(current_frame)
-        cv2.imwrite(filename, current_frame)
+        #depth_frame = np.reshape(depth_data,(self.IM_HEIGHT,self.IM_WIDTH))
+        #print(depth_frame)
     
-    def info_received(self,msg):
+    def waypoints_received(self,msg):
+        if msg is not None and self.num_samples > 0:
+            self.points_array = np.zeros(shape=(self.num_samples*self.num_trajectories,3))
+            waypoints = msg.waypoints
+
+            for index, waypoint in enumerate(waypoints):
+                mat = ros2_numpy.numpify(waypoint.pose)
+                self.points_array[index,:] = mat[:-1,-1]
+            
+            self.points_array= self.points_array.T
+            self.points_array[0,:] = self.points_array[0,:]*self.stretch
+            homogen = np.ones(self.points_array.shape[1])
+            self.points_array = np.vstack([self.points_array,homogen])
+            self.waypoint_subscriber_.destroy() ## destroy subscription after storing waypoints
+    
+    def waypoints_info_received(self,msg):
+        if msg is not None:
+            self.num_trajectories = msg.trajectories
+            self.num_samples = msg.samples
+            self.waypoint_info_subscriber_.destroy()
+    
+    def camera_info_received(self,msg):
         ## http://docs.ros.org/en/kinetic/api/image_geometry/html/python/index.html#module-image_geometry
-        self.camera_model = image_geometry.PinholeCameraModel()
-        self.camera_model.fromCameraInfo(msg)
-        print(self.camera_model.intrinsicMatrix())
-        self.camera_info_subscriber_.destroy() ## destroy subscription after storing camera params
+        if msg is not None:
+            self.camera_model = image_geometry.PinholeCameraModel()
+            self.camera_model.fromCameraInfo(msg)
+            self.camera_info_subscriber_.destroy() ## destroy subscription after storing camera params
+    
+    def tf_received(self,msg):
+        """
+        Collect relevant tf information to build base_link to depth_camera transformation
+        """
+        if msg is not None:
+            baselnk_2_camera = msg.transforms[2].transform
+            baselnk_2_camera.rotation = msg.transforms[1].transform.rotation ## combine rotation and translation to create one tf between base_link and depth_camera
+            self.baselnk_2_camera = ros2_numpy.numpify(baselnk_2_camera)
+            self.tf_subscriber_.destroy() ## destroy subscription after storing transformations
 
 def main(args=None):
     rclpy.init(args=args)

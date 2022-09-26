@@ -1,11 +1,9 @@
 #!/usr/bin/python3 
 import rclpy
 from rclpy.node import Node
-from planning_interfaces.msg import Waypoint, WaypointArray
+from planning_interfaces.msg import Waypoint, WaypointArray, WaypointInfo
 from sensor_msgs.msg import CameraInfo
 from visualization_msgs.msg import Marker, MarkerArray
-from geometry_msgs.msg import Transform
-from tf2_msgs.msg import TFMessage
 import math 
 import numpy as np
 import image_geometry
@@ -15,9 +13,9 @@ from waypoint_generator.utils import storage
 class WaypointPublisher(Node):
     def __init__(self):
         super().__init__('waypoint_publisher')
-        self.waypoints_publisher_ = self.create_publisher(WaypointArray,'global_waypoints',10)
-        self.waypoints_visualiser_ = self.create_publisher(MarkerArray,'global_waypoint_markers',0)
-        self.tf_subscriber_ = self.create_subscription(TFMessage,  "/tf_static",self.tf_received,10)
+        self.waypoints_publisher_ = self.create_publisher(WaypointArray,'/local_waypoints',10)
+        self.waypoints_visualiser_ = self.create_publisher(MarkerArray,'/local_waypoint_markers',10)
+        self.waypoints_info_ = self.create_publisher(WaypointInfo,'/local_waypoint_info',10)
         self.camera_info_subscriber_ = self.create_subscription(CameraInfo,"/camera/depth/camera_info",self.info_received,10)
         timer_period = 0.5
         self.timer = self.create_timer(timer_period,self.timer_callback)
@@ -32,8 +30,9 @@ class WaypointPublisher(Node):
         self.grid_size = (0,0)
         self.waypoints = WaypointArray()
         self.waypoint_markers = MarkerArray()
+        self.waypoint_info = WaypointInfo()
         self.base_link_height = 0.0
-        self.baselnk_2_camera = Transform()
+        
         self.published = False
 
     def connect_endpoints(self,point1, point2):
@@ -57,6 +56,9 @@ class WaypointPublisher(Node):
         """
         Generate a set of cartesian trajectories based on a given grid size.
         """
+        self.waypoint_info.samples = self.sampling_points
+        self.waypoint_info.trajectories = self.num_trajectories
+
         y_endpoints = np.linspace(-self.grid_size[0], self.grid_size[0], self.num_trajectories)
         x_endpoints = self.grid_size[1]*np.ones_like(y_endpoints)
 
@@ -89,7 +91,7 @@ class WaypointPublisher(Node):
                 marker = Marker()
                 marker.header.frame_id = waypoint.frame_id
                 marker.type = 2
-                marker.ns = 'global_waypoint'
+                marker.ns = 'local_waypoint'
                 marker.id = id_count
                 marker.scale.x = 0.1
                 marker.scale.y = 0.1
@@ -99,47 +101,37 @@ class WaypointPublisher(Node):
                 marker.color.r = 1.0
                 self.waypoint_markers.markers.append(marker)
                 id_count+=1
-    
-    def tf_received(self,msg):
-        """
-        Collect relevant tf information to build base_link to depth_camera transformation
-        """
-        if msg is not None:
-            self.base_link_height = msg.transforms[0].transform.translation.z ## set world trajectories at correct height
-            baselnk_2_camera = msg.transforms[2].transform
-            baselnk_2_camera.rotation = msg.transforms[1].transform.rotation ## combine rotation and translation to create one tf between base_link and depth_camera
-            self.baselnk_2_camera = baselnk_2_camera
-            self.tf_subscriber_.destroy() ## destroy subscription after storing transformations
 
     def info_received(self,msg):
         """
         Collect and store camera intrinsics
         http://docs.ros.org/en/kinetic/api/image_geometry/html/python/index.html#module-image_geometry
         """
-        camera_model = image_geometry.PinholeCameraModel()
-        camera_model.fromCameraInfo(msg)
-        storage.update_param(self.path,"intrinsic.npy",camera_model.intrinsicMatrix())
-        self.grid_size = (self.grid_width,(self.grid_width/self.IM_WIDTH)*camera_model.fx()) #(width, height -> y,x using robotics coordinate frame)
-        self.camera_info_subscriber_.destroy() ## destroy subscription after storing camera params
-    
+        if msg is not None:
+            camera_model = image_geometry.PinholeCameraModel()
+            camera_model.fromCameraInfo(msg)
+            storage.update_param(self.path,"intrinsic.npy",camera_model.intrinsicMatrix())
+            self.grid_size = (self.grid_width,(self.grid_width/self.IM_WIDTH)*camera_model.fx()) #(width, height -> y,x using robotics coordinate frame)
+            self.camera_info_subscriber_.destroy() ## destroy subscription after storing camera params
+        
     def timer_callback(self):
         """
         Run steps for waypoint generation and publish
         """
+
         if not self.published:
             time.sleep(1) ## wait until camera params are stored
             self.generate_points()
             time.sleep(1) ## wait until waypoints have been generated fully 
-            print(self.points_array)
             self.set_world_waypoints()
             storage.update_param(self.path,"waypoints.npy",self.points_array)
             self.waypoints_publisher_.publish(self.waypoints)
             self.waypoints_visualiser_.publish(self.waypoint_markers)
             self.published = True
-            print("finished creating trajectories!")
         else:
             self.waypoints_publisher_.publish(self.waypoints)
             self.waypoints_visualiser_.publish(self.waypoint_markers)
+            self.waypoints_info_.publish(self.waypoint_info)
     
 def main(args=None):
     rclpy.init(args=args)
