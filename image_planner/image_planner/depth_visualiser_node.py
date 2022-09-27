@@ -19,6 +19,7 @@ class DepthVisualiser(Node):
         self.camera_info_subscriber_ = self.create_subscription(CameraInfo,"/camera/depth/camera_info",self.camera_info_received,10)
         self.waypoint_subscriber_ = self.create_subscription(WaypointArray,"/local_waypoints",self.waypoints_received,10)
         self.waypoint_info_subscriber_ = self.create_subscription(WaypointInfo,"/local_waypoint_info",self.waypoints_info_received,10)
+        self.image_publisher_ = self.create_publisher(Image, '/waypoint_overlay', 10)
         timer_period = 1/10
         self.timer = self.create_timer(timer_period,self.timer_callback)
         self.points_array = None
@@ -29,20 +30,18 @@ class DepthVisualiser(Node):
         self.IM_WIDTH = 640
         self.num_trajectories = 0
         self.num_samples = 0
-        self.stretch = 5 #Make trajectories slightly stretch slightly further away so they appear in camera frame
 
     def timer_callback(self):
         if self.points_array is not None and self.baselnk_2_camera is not None and self.camera_model is not None:
             camera_points = transforms.transform_points(self.baselnk_2_camera, self.points_array)
             self.camera_traj_pixels = transforms.project_points(self.camera_model.intrinsicMatrix(),camera_points)
-            # self.camera_traj_pixels = np.delete(self.camera_traj_pixels, np.where((self.camera_traj_pixels[:,0] > self.IM_HEIGHT) & (self.camera_traj_pixels[:,1] > self.IM_WIDTH))[0], axis=1)
-            print(self.camera_traj_pixels.shape)
-            
+
     def image_received(self,msg):
         current_frame = ros2_numpy.numpify(msg)
         if self.camera_traj_pixels is not None:
-            current_frame[self.camera_traj_pixels[0,:],self.camera_traj_pixels[1,:],:] = 255
-            print(current_frame)
+            current_frame[self.camera_traj_pixels[1,:],self.camera_traj_pixels[0,:],:] = 255
+            img = ros2_numpy.msgify(Image, current_frame,encoding="rgb8")
+            self.image_publisher_.publish(img)
 
     def depth_received(self,msg):
         depth_data = ros2_numpy.numpify(msg)
@@ -59,7 +58,6 @@ class DepthVisualiser(Node):
                 self.points_array[index,:] = mat[:-1,-1]
             
             self.points_array= self.points_array.T
-            self.points_array[0,:] = self.points_array[0,:]*self.stretch
             homogen = np.ones(self.points_array.shape[1])
             self.points_array = np.vstack([self.points_array,homogen])
             self.waypoint_subscriber_.destroy() ## destroy subscription after storing waypoints

@@ -22,12 +22,14 @@ class WaypointPublisher(Node):
         self.camera_model = None 
         self.IM_HEIGHT = 480 ## see Gazebo camera definition TODO: add args parser  https://github.com/oKermorgant/simple_launch
         self.IM_WIDTH = 640 
-        self.path = "../../params"
+        self.path = "../../../params"
         self.num_trajectories = 15 # number of trajectories desired TODO: add args parser 
         self.sampling_points = 10 # samples per trajectory
         self.points_array = np.zeros((self.num_trajectories,self.sampling_points,3))
-        self.grid_width = 0.85 ## TODO: add args parser 
+        self.grid_width = 2 ## TODO: add args parser 
         self.grid_size = (0,0)
+        self.stretch = 3 
+        self.offset = 0.41 ## assumed safe distance in front of vehicle
         self.waypoints = WaypointArray()
         self.waypoint_markers = MarkerArray()
         self.waypoint_info = WaypointInfo()
@@ -64,6 +66,7 @@ class WaypointPublisher(Node):
 
         for trajectory in range(self.num_trajectories):
             y_points,x_points = self.connect_endpoints((y_endpoints[trajectory],x_endpoints[trajectory]),np.array([0,0]))
+            x_points = x_points + self.offset
             z_points = np.zeros(self.sampling_points)
             points = np.stack((x_points,y_points,z_points), axis=-1)
             points = np.nan_to_num(points)
@@ -111,7 +114,7 @@ class WaypointPublisher(Node):
             camera_model = image_geometry.PinholeCameraModel()
             camera_model.fromCameraInfo(msg)
             storage.update_param(self.path,"intrinsic.npy",camera_model.intrinsicMatrix())
-            self.grid_size = (self.grid_width,(self.grid_width/self.IM_WIDTH)*camera_model.fx()) #(width, height -> y,x using robotics coordinate frame)
+            self.grid_size = (self.grid_width,self.stretch*(self.grid_width/self.IM_WIDTH)*camera_model.fx()) #(width, height -> y,x using robotics coordinate frame)
             self.camera_info_subscriber_.destroy() ## destroy subscription after storing camera params
         
     def timer_callback(self):
