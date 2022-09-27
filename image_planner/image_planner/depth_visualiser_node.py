@@ -2,7 +2,7 @@
 from re import S
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image, PointCloud2, CameraInfo
+from sensor_msgs.msg import Image,CameraInfo
 import numpy as np
 import ros2_numpy 
 import image_geometry

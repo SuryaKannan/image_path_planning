@@ -127,6 +127,7 @@ class WaypointPublisher(Node):
             self.generate_points()
             time.sleep(1) ## wait until waypoints have been generated fully 
             self.set_world_waypoints()
+            # print(self.points_array)
             storage.update_param(self.path,"waypoints.npy",self.points_array)
             self.waypoints_publisher_.publish(self.waypoints)
             self.waypoints_visualiser_.publish(self.waypoint_markers)
