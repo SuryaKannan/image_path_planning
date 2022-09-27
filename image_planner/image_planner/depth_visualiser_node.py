@@ -13,8 +13,9 @@ from image_planner.utils import transforms
 class DepthVisualiser(Node):
     def __init__(self):
         super().__init__('depth_visualiser')
-        self.depth_subscriber_ = self.create_subscription(PointCloud2,"/camera/depth/color/points",self.depth_received,10)
-        self.image_subscriber_ = self.create_subscription(Image,"/camera/color/image_raw",self.image_received,10) # /camera/color/image_raw, /camera/depth/image_rect_raw
+        # self.depth_subscriber_ = self.create_subscription(PointCloud2,"/camera/depth/color/points",self.depth_received,10)
+        self.depth_subscriber_ = self.create_subscription(Image,"/camera/depth/image_rect_raw",self.depth_received,10)
+        self.image_subscriber_ = self.create_subscription(Image,"/camera/color/image_raw",self.image_received,10)
         self.tf_subscriber_ = self.create_subscription(TFMessage,"/tf_static",self.tf_received,10)
         self.camera_info_subscriber_ = self.create_subscription(CameraInfo,"/camera/depth/camera_info",self.camera_info_received,10)
         self.waypoint_subscriber_ = self.create_subscription(WaypointArray,"/local_waypoints",self.waypoints_received,10)
@@ -39,14 +40,16 @@ class DepthVisualiser(Node):
     def image_received(self,msg):
         current_frame = ros2_numpy.numpify(msg)
         if self.camera_traj_pixels is not None:
-            current_frame[self.camera_traj_pixels[1,:],self.camera_traj_pixels[0,:],:] = 255
+            current_frame[self.camera_traj_pixels[1,:],self.camera_traj_pixels[0,:],:] = np.array([255,0,0])
             img = ros2_numpy.msgify(Image, current_frame,encoding="rgb8")
             self.image_publisher_.publish(img)
 
     def depth_received(self,msg):
-        depth_data = ros2_numpy.numpify(msg)
-        #depth_frame = np.reshape(depth_data,(self.IM_HEIGHT,self.IM_WIDTH))
-        #print(depth_frame)
+        depth_frame = ros2_numpy.numpify(msg)
+        depth_frame = np.array(depth_frame, dtype=np.float32)
+        center_idx = np.array(depth_frame.shape) // 2
+        print ('center depth:', depth_frame[center_idx[0], center_idx[1]])
+
     
     def waypoints_received(self,msg):
         if msg is not None and self.num_samples > 0:
