@@ -1,6 +1,6 @@
 from setuptools import setup
 
-package_name = 'pure_pursuit'
+package_name = 'controller'
 
 setup(
     name=package_name,
@@ -20,7 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'controller = pure_pursuit.controller:main'
+            'control = controller.control:main'
         ],
     },
 )
