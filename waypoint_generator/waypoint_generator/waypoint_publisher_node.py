@@ -23,7 +23,7 @@ class WaypointPublisher(Node):
         self.IM_HEIGHT = 480 ## see Gazebo camera definition TODO: add args parser  https://github.com/oKermorgant/simple_launch
         self.IM_WIDTH = 640 
         self.path = "../../../params"
-        self.num_trajectories = 15 # number of trajectories desired TODO: add args parser 
+        self.num_trajectories = 16 # number of trajectories desired TODO: add args parser 
         self.sampling_points = 10 # samples per trajectory
         self.points_array = np.zeros((self.num_trajectories,self.sampling_points,3))
         self.grid_width = 2 ## TODO: add args parser 

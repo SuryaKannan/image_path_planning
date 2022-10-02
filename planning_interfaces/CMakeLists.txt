@@ -30,7 +30,6 @@ rosidl_generate_interfaces(${PROJECT_NAME}
     "msg/WaypointArray.msg"
     "msg/WaypointInfo.msg"
     "msg/Tentacle.msg"
-    "msg/TentacleArray.msg"
     DEPENDENCIES geometry_msgs
     DEPENDENCIES std_msgs
 )
