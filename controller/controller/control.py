@@ -23,9 +23,10 @@ class Controller(Node):
         self.goal = np.array([0,0])      
         self.num_trajectories = 0
         self.num_samples = 0
-        self.goal_range = 0.1 
-        self.max_speed = 1
-        self.slow_dist = 0.5
+        self.goal_range = 0.5 
+        self.max_speed = 2
+        self.slow_dist = 2.5
+        self.goal_set = False
         self.motion = Twist()
 
     def waypoints_received(self,msg):
@@ -50,24 +51,31 @@ class Controller(Node):
         self.pose = np.array([msg.pose.pose.position.x,msg.pose.pose.position.y])
 
     def goal_received(self,msg):
-        self.goal = np.array([msg.pose.position.x,msg.pose.position.y])
+        if msg is not None:
+            self.goal = np.array([msg.pose.position.x,msg.pose.position.y])
+            self.goal_set = True
 
     def calc_vel(self,dist):
         if dist > self.slow_dist:
             return self.max_speed
         else:
-            return (self.max_speed/self.slow_dist)*dist
+            return (self.max_speed/self.slow_dist**2)*(dist**2) ## follow a parabolic velocity curve for braking 
         
     def timer_callback(self):
-        dist_to_goal = np.linalg.norm(self.goal - self.pose)
+        if self.goal_set:
+            dist_to_goal = np.linalg.norm(self.goal - self.pose)
 
-        if dist_to_goal > self.goal_range:
-            self.motion.linear.x = np.float(self.calc_vel(dist_to_goal))
-        else: 
-            self.motion.linear.x = 0.0
-            self.motion.angular.z = 0.0
-        
-        self.velocity_publisher_.publish(self.motion)
+            print("distance: ",dist_to_goal,"","speed: ",self.calc_vel(dist_to_goal))
+
+            if dist_to_goal > self.goal_range:
+                self.motion.linear.x = np.float(self.calc_vel(dist_to_goal))
+            else: 
+                print("reached goal!")
+                self.motion.linear.x = 0.0
+                self.motion.angular.z = 0.0
+                self.goal_set = False
+
+            self.velocity_publisher_.publish(self.motion)
 
 def main(args = None):
     rclpy.init(args=args)
@@ -77,5 +85,4 @@ def main(args = None):
     rclpy.shutdown()
 
 if __name__ == '__main__':
-    print("Pure pursuit path tracking simulation start")
     main()
