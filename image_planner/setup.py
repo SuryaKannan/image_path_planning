@@ -1,11 +1,12 @@
 from setuptools import setup
 
 package_name = 'image_planner'
+submodules = 'image_planner/utils'
 
 setup(
     name=package_name,
     version='0.0.0',
-    packages=[package_name],
+    packages=[package_name,submodules],
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
@@ -20,7 +21,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'depth_visualiser = image_planner.depth_visualiser_node:main'
+            'tentacle_planner = image_planner.tentacle_planner_node:main'
         ],
     },
 )

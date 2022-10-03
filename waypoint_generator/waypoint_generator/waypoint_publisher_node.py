@@ -7,7 +7,6 @@ from visualization_msgs.msg import Marker, MarkerArray
 import math 
 import numpy as np
 import image_geometry
-import time
 from waypoint_generator.utils import storage
 
 class WaypointPublisher(Node):
@@ -17,29 +16,30 @@ class WaypointPublisher(Node):
         self.waypoints_visualiser_ = self.create_publisher(MarkerArray,'/local_waypoint_markers',10)
         self.waypoints_info_ = self.create_publisher(WaypointInfo,'/local_waypoint_info',10)
         self.camera_info_subscriber_ = self.create_subscription(CameraInfo,"/camera/depth/camera_info",self.info_received,10)
-        timer_period = 0.5
-        self.timer = self.create_timer(timer_period,self.timer_callback)
-        self.camera_model = None 
-        self.IM_HEIGHT = 480 ## see Gazebo camera definition TODO: add args parser  https://github.com/oKermorgant/simple_launch
+        self.timer = self.create_timer(0.5,self.timer_callback) ## publisher for waypoints 
+
+        ## TODO create yaml config
+        self.IM_HEIGHT = 480 ## see Gazebo camera definition 
         self.IM_WIDTH = 640 
         self.path = "../../../params"
-        self.num_trajectories = 16 # number of trajectories desired TODO: add args parser 
-        self.sampling_points = 10 # samples per trajectory
+        self.num_trajectories = 16 # number of desired trajectories desired 
+        self.sampling_points = 10 # desired samples per trajectory 
         self.points_array = np.zeros((self.num_trajectories,self.sampling_points,3))
-        self.grid_width = 2 ## TODO: add args parser 
+        self.grid_width = 2 ## width of grid in y direction 
         self.grid_size = (0,0)
         self.stretch = 3 
-        self.offset = 0.41 ## assumed safe distance in front of vehicle
+        self.offset = 0.41 ## assumed safe distance in front of vehicle that we commence planning on 
+        self.base_link_height = 0.0
+        self.published = False
+        
+        self.camera_model = image_geometry.PinholeCameraModel()
         self.waypoints = WaypointArray()
         self.waypoint_markers = MarkerArray()
         self.waypoint_info = WaypointInfo()
-        self.base_link_height = 0.0
-        
-        self.published = False
 
     def connect_endpoints(self,point1, point2):
         """
-        Connect a set of two cartesian endpoints parabolically using a fixed number of sample.
+        Connect a set of two cartesian endpoints parabolically using a fixed number of samples
             point1 -> first endpoint
             point2 -> second endpoint
         """
@@ -56,7 +56,7 @@ class WaypointPublisher(Node):
 
     def generate_points(self):
         """
-        Generate a set of cartesian trajectories based on a given grid size.
+        Generate a set of cartesian trajectories based on a given grid size in the standard robotics coordinate frame
         """
         self.waypoint_info.samples = self.sampling_points
         self.waypoint_info.trajectories = self.num_trajectories
@@ -74,13 +74,13 @@ class WaypointPublisher(Node):
 
     def set_world_waypoints(self):
         """
-        Publish 3D world points based on a fixed world frame
+        Publish 3D world points based on a fixed world frame (base_link) and respective markers for visualisation
         """
         id_count = 0
         for trajectory in range(self.num_trajectories):
             for point in range(self.sampling_points):
                 waypoint = Waypoint()
-                waypoint.frame_id = 'base_link' ## this is the origin of the robot frame
+                waypoint.frame_id = 'base_link' 
                 waypoint.pose.position.x = self.points_array[trajectory,point,0]
                 waypoint.pose.position.y = self.points_array[trajectory,point,1]
                 waypoint.pose.position.z = self.base_link_height
@@ -107,31 +107,27 @@ class WaypointPublisher(Node):
 
     def info_received(self,msg):
         """
-        Collect and store camera intrinsics
+        Collect and store camera intrinsics, update grid size
         http://docs.ros.org/en/kinetic/api/image_geometry/html/python/index.html#module-image_geometry
         """
         if msg is not None:
             camera_model = image_geometry.PinholeCameraModel()
             camera_model.fromCameraInfo(msg)
             storage.update_param(self.path,"intrinsic.npy",camera_model.intrinsicMatrix())
-            self.grid_size = (self.grid_width,self.stretch*(self.grid_width/self.IM_WIDTH)*camera_model.fx()) #(width, height -> y,x using robotics coordinate frame)
+            self.grid_size = (self.grid_width,self.stretch*(self.grid_width/self.IM_WIDTH)*camera_model.fx()) ## calculate size of grid (width,height) based on FOV
             self.camera_info_subscriber_.destroy() ## destroy subscription after storing camera params
         
     def timer_callback(self):
         """
-        Run steps for waypoint generation and publish
+        Generate and publish waypoints 
         """
-
         if not self.published:
-            time.sleep(1) ## wait until camera params are stored
             self.generate_points()
-            time.sleep(1) ## wait until waypoints have been generated fully 
             self.set_world_waypoints()
-            # print(self.points_array)
             storage.update_param(self.path,"waypoints.npy",self.points_array)
             self.waypoints_publisher_.publish(self.waypoints)
             self.waypoints_visualiser_.publish(self.waypoint_markers)
-            self.published = True
+            self.published = True ## avoid recomputing waypoints
         else:
             self.waypoints_publisher_.publish(self.waypoints)
             self.waypoints_visualiser_.publish(self.waypoint_markers)
