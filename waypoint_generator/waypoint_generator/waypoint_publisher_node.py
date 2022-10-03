@@ -21,7 +21,7 @@ class WaypointPublisher(Node):
         ## TODO create yaml config
         self.IM_HEIGHT = 480 ## see Gazebo camera definition 
         self.IM_WIDTH = 640 
-        self.path = "../../../params"
+        self.path = "src/image_path_planning/params"
         self.num_trajectories = 16 # number of desired trajectories desired 
         self.sampling_points = 10 # desired samples per trajectory 
         self.points_array = np.zeros((self.num_trajectories,self.sampling_points,3))

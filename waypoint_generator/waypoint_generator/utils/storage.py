@@ -3,6 +3,9 @@ import os
 import numpy as np
 
 def update_param(path,filename,data):
+    '''
+    Store waypoints and intrinsic matrix for visualisation / debugging
+    '''
     if os.path.isdir(path):
         if filename == "waypoints.npy":
             data = np.reshape(data,(data.shape[0]*data.shape[1],data.shape[2]))
