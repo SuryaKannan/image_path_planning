@@ -22,7 +22,7 @@ source install/setup.bash
 
 ## Quick Start
 
-TODO: Instructio-set to get a demonstration working 
+TODO: Instruction-set to get a demonstration working 
 
 ## Packages
 
@@ -77,7 +77,7 @@ TODO: Instructio-set to get a demonstration working
 ## Acknowledgements
 
 ### [LinoRobot2](https://github.com/linorobot/linorobot2)
-- ROS2 port of the [linorobot](https://github.com/linorobot/linorobot) package. Helps to build a custom ROS2 robot (2WD, 4WD, Mecanum Drive) using accessible parts. Able to easily verify experiments on a virtual robot in Gazebo.
+- ROS2 port of the [linorobot](https://github.com/linorobot/linorobot) package. Helps to build a custom ROS2 robot (2WD, 4WD, Mecanum Drive) using accessible parts. Able to easily verify experiments on a virtual robot in Gazebo
 ### [ros2_numpy](https://github.com/Box-Robotics/ros2_numpy/tree/743513e56e3f35aa91ce07799de4b0f2f59f88c0)
 - tools for converting ROS messages to and from numpy arrays for ROS2
 

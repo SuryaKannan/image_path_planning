@@ -110,12 +110,10 @@ class WaypointPublisher(Node):
         Collect and store camera intrinsics, update grid size
         http://docs.ros.org/en/kinetic/api/image_geometry/html/python/index.html#module-image_geometry
         """
-        if msg is not None:
-            camera_model = image_geometry.PinholeCameraModel()
-            camera_model.fromCameraInfo(msg)
-            storage.update_param(self.path,"intrinsic.npy",camera_model.intrinsicMatrix())
-            self.grid_size = (self.grid_width,self.stretch*(self.grid_width/self.IM_WIDTH)*camera_model.fx()) ## calculate size of grid (width,height) based on FOV
-            self.camera_info_subscriber_.destroy() ## destroy subscription after storing camera params
+        self.camera_model.fromCameraInfo(msg)
+        storage.update_param(self.path,"intrinsic.npy",self.camera_model.intrinsicMatrix())
+        self.grid_size = (self.grid_width,self.stretch*(self.grid_width/self.IM_WIDTH)*self.camera_model.fx()) ## calculate size of grid (width,height) based on FOV
+        self.camera_info_subscriber_.destroy() ## destroy subscription after storing camera params
         
     def timer_callback(self):
         """
