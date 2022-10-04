@@ -1,11 +1,11 @@
 from setuptools import setup
 
-package_name = 'waypoint_generator'
-submodules = 'waypoint_generator/utils'
+package_name = 'image_planner'
+submodules = 'image_planner/utils'
 
 setup(
     name=package_name,
-    version='1.0.0',
+    version='0.0.0',
     packages=[package_name,submodules],
     data_files=[
         ('share/ament_index/resource_index/packages',
@@ -16,12 +16,12 @@ setup(
     zip_safe=True,
     maintainer='suryak',
     maintainer_email='skan0017@student.monash.edu',
-    description='publish global waypoints',
-    license='MIT',
+    description='TODO: Package description',
+    license='TODO: License declaration',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-                'waypoint_publisher = waypoint_generator.waypoint_publisher_node:main'
+            'tentacle_planner = image_planner.tentacle_planner_node:main'
         ],
     },
 )
