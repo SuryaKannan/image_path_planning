@@ -2,7 +2,7 @@
 # 📷 Image Path Planning
 > ROS2 based local planning package designed to work with RGBD cameras. 
 
-<p align="middle"><img align="top" src="docs/img/image_planner_waypoints.png" width="425" height="300"/><img align="top" src="docs/img/image_planner_projection.png" width="425" height="300"/> </p>
+<p align="middle"><img align="top" src="docs/img/image_planner_waypoints.png" width="350" height="250"/><img align="top" src="docs/img/image_planner_projection.png" width="350" height="250"/> </p>
 
 
 The image planner considers optimal trajectories in a short term horizon within in the image space, removing the need of local cost map generation.
@@ -36,7 +36,6 @@ ros2 launch image_planner image_planner.launch.py rviz:=true
 ```
 
 ### 3) Select a Goal Pose using RVIZ 
-<p align="middle"><img align="top" src="docs/img/goal_set.png" width="700" height="450"/></p>
 
 ## Packages
 
@@ -157,7 +156,7 @@ Distance at which to start following a parabolic braking profile
 
 ## Acknowledgements
 
-### [LinoRobot2](https://github.com/linorobot/linorobot2)
+### [linorobot2](https://github.com/linorobot/linorobot2)
 - ROS2 port of the [linorobot](https://github.com/linorobot/linorobot) package. Helps to build a custom ROS2 robot (2WD, 4WD, Mecanum Drive) using accessible parts. Able to easily verify experiments on a virtual robot in Gazebo
 ### [ros2_numpy](https://github.com/Box-Robotics/ros2_numpy/tree/743513e56e3f35aa91ce07799de4b0f2f59f88c0)
 - tools for converting ROS messages to and from numpy arrays for ROS2
