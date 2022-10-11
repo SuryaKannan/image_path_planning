@@ -6,6 +6,7 @@ import ros2_numpy
 from planning_interfaces.msg import WaypointArray, WaypointInfo
 from geometry_msgs.msg import PoseStamped, Twist
 from nav_msgs.msg import Odometry
+from planning_interfaces.msg import Tentacle
   
 class Controller(Node):
     def __init__(self):
@@ -14,11 +15,13 @@ class Controller(Node):
         self.waypoint_subscriber_ = self.create_subscription(WaypointArray,"/local_waypoints",self.waypoints_received,10)
         self.waypoint_info_subscriber_ = self.create_subscription(WaypointInfo,"/local_waypoint_info",self.waypoints_info_received,10)
         self.goal_subscriber_ = self.create_subscription(PoseStamped,"/goal_pose",self.goal_received,10)
+        self.tentacle_subscriber_ = self.create_subscription(Tentacle,"/tentacle_selection",self.tentacle_received,10)
         self.velocity_publisher_ = self.create_publisher(Twist,'/cmd_vel',10)
         timer_period = 1/10 ## 10Hz 
         self.timer = self.create_timer(timer_period,self.timer_callback)
 
-        self.local_waypoints = None 
+        self.y_dists = None 
+        self.y_arc = 4 ## waypoint from all trajectories to create a radius from
         self.pose = np.array([0,0])   
         self.goal = np.array([0,0])      
         self.num_trajectories = 0
@@ -28,8 +31,13 @@ class Controller(Node):
         self.slow_dist = 2.5
         self.goal_set = False
         self.motion = Twist()
+        self.tentacle = None
 
     def waypoints_received(self,msg):
+        '''
+        Receive all waypoints but only store desired waypoints based on radius chosen to create angular velocity.
+        This esentially means sampling the same waypoint from each tentacle. 
+        '''
         if msg is not None and self.num_samples > 0:
             points_array = np.zeros(shape=(self.num_samples*self.num_trajectories,3))
             waypoints = msg.waypoints
@@ -38,7 +46,8 @@ class Controller(Node):
                 mat = ros2_numpy.numpify(waypoint.pose)
                 points_array[index,:] = mat[:-1,-1]
 
-            self.local_waypoints = points_array
+            self.y_dists = np.reshape(points_array[:,1],(self.num_samples,self.num_trajectories))
+            self.y_dists = self.y_dists[self.y_dists.shape[0]-self.y_arc,:]
             self.waypoint_subscriber_.destroy() ## destroy subscription after storing waypoints
     
     def waypoints_info_received(self,msg):
@@ -60,15 +69,24 @@ class Controller(Node):
             return self.max_speed
         else:
             return (self.max_speed/self.slow_dist**2)*(dist**2) ## follow a parabolic velocity curve for braking 
+    
+    def calc_angular(self,vel,dist):
+        
+        return 2*vel*(self.y_dists[self.tentacle]/dist**2) ## generate an angular velocity based on a chosen tentacle
+        
+    def tentacle_received(self,msg):
+        self.tentacle = msg.tentacle_id
         
     def timer_callback(self):
         if self.goal_set:
             dist_to_goal = np.linalg.norm(self.goal - self.pose)
 
-            print("distance: ",dist_to_goal,"","speed: ",self.calc_vel(dist_to_goal))
+            print("distance: ",dist_to_goal,"","forward velocity: ",self.calc_vel(dist_to_goal))
 
             if dist_to_goal > self.goal_range:
-                self.motion.linear.x = np.float(self.calc_vel(dist_to_goal))
+                vel = np.float(self.calc_vel(dist_to_goal))
+                self.motion.linear.x = vel
+                self.motion.angular.z =  np.float(self.calc_angular(vel,dist_to_goal))
             else: 
                 print("reached goal!")
                 self.motion.linear.x = 0.0

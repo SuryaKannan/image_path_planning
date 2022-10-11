@@ -25,7 +25,7 @@ class TentaclePlanner(Node):
         self.image_publisher_ = self.create_publisher(Image, '/waypoint_overlay', 10)
         self.tentacle_publisher_ = self.create_publisher(Tentacle, '/tentacle_selection', 10)
         
-        self.visualise = False
+        self.visualise = True
         self.plan_to_goal = False
         self.IM_HEIGHT = 480
         self.IM_WIDTH = 640
