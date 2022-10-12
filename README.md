@@ -110,7 +110,7 @@ Goal position chosen
 #### Parameters
 
 `~crit_dist`<br/> 
-Acceptable threshold used to compare desired depth and measured depth
+Acceptable threshold used to compare desired depth and measured depth when calculating number of collisions
 
 &nbsp;
 
