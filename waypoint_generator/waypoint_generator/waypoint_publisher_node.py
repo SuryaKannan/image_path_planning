@@ -1,12 +1,12 @@
 #!/usr/bin/python3 
-import rclpy
-from rclpy.node import Node
-from planning_interfaces.msg import Waypoint, WaypointArray, WaypointInfo
-from sensor_msgs.msg import CameraInfo
-from visualization_msgs.msg import Marker, MarkerArray
 import math 
 import numpy as np
-import image_geometry
+import rclpy
+from rclpy.node import Node
+from image_geometry import PinholeCameraModel
+from sensor_msgs.msg import CameraInfo
+from visualization_msgs.msg import Marker, MarkerArray
+from planning_interfaces.msg import Waypoint, WaypointArray, WaypointInfo, Tentacle
 from waypoint_generator.utils import storage
 
 class WaypointPublisher(Node):
@@ -15,13 +15,13 @@ class WaypointPublisher(Node):
         self.waypoints_publisher_ = self.create_publisher(WaypointArray,'/local_waypoints',10)
         self.waypoints_visualiser_ = self.create_publisher(MarkerArray,'/local_waypoint_markers',10)
         self.waypoints_info_ = self.create_publisher(WaypointInfo,'/local_waypoint_info',10)
+        self.tentacle_subscriber_ = self.create_subscription(Tentacle,"/tentacle_selection",self.tentacle_received,10)
         self.camera_info_subscriber_ = self.create_subscription(CameraInfo,"/camera/depth/camera_info",self.info_received,10)
         self.timer = self.create_timer(0.5,self.timer_callback) ## publisher for waypoints 
 
-        ## TODO create yaml config
         self.IM_HEIGHT = 480 ## see Gazebo camera definition 
         self.IM_WIDTH = 640 
-        self.path = "src/image_path_planning/params"
+        self.path = "src/image_path_planning/params" ## path to params for notebook visualisation
         self.num_trajectories = 16 # number of desired trajectories desired 
         self.sampling_points = 10 # desired samples per trajectory 
         self.points_array = np.zeros((self.num_trajectories,self.sampling_points,3))
@@ -31,8 +31,8 @@ class WaypointPublisher(Node):
         self.offset = 0.41 ## assumed safe distance in front of vehicle that we commence planning on 
         self.base_link_height = 0.0
         self.published = False
-        
-        self.camera_model = image_geometry.PinholeCameraModel()
+
+        self.camera_model = PinholeCameraModel()
         self.waypoints = WaypointArray()
         self.waypoint_markers = MarkerArray()
         self.waypoint_info = WaypointInfo()
@@ -71,6 +71,8 @@ class WaypointPublisher(Node):
             points = np.stack((x_points,y_points,z_points), axis=-1)
             points = np.nan_to_num(points)
             self.points_array[trajectory,:,:] = points
+
+        storage.update_param(self.path,"waypoints.npy",self.points_array)
 
     def set_world_waypoints(self):
         """
@@ -117,19 +119,30 @@ class WaypointPublisher(Node):
         
     def timer_callback(self):
         """
-        Generate and publish waypoints 
+        Publish waypoints 
         """
-        if not self.published:
+        if self.published == False:
             self.generate_points()
             self.set_world_waypoints()
-            storage.update_param(self.path,"waypoints.npy",self.points_array)
-            self.waypoints_publisher_.publish(self.waypoints)
-            self.waypoints_visualiser_.publish(self.waypoint_markers)
-            self.published = True ## avoid recomputing waypoints
-        else:
-            self.waypoints_publisher_.publish(self.waypoints)
-            self.waypoints_visualiser_.publish(self.waypoint_markers)
-            self.waypoints_info_.publish(self.waypoint_info)
+            self.published = True
+        self.waypoints_publisher_.publish(self.waypoints)
+        self.waypoints_visualiser_.publish(self.waypoint_markers)
+        self.waypoints_info_.publish(self.waypoint_info)
+
+    def tentacle_received(self,msg):
+        """
+        Make optimum trajectories green 
+        """
+        self.tentacle = msg.tentacle_id
+        goal_markers = self.waypoint_markers.markers[(self.tentacle*self.sampling_points):(self.tentacle+1)*self.sampling_points-1]
+
+        for marker in self.waypoint_markers.markers:
+            marker.color.r = 1.0
+            marker.color.g = 0.0
+
+        for goal in goal_markers:
+            goal.color.g = 1.0
+            goal.color.r = 0.0
     
 def main(args=None):
     rclpy.init(args=args)

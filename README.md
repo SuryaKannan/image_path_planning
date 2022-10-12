@@ -5,7 +5,7 @@
 <p align="middle"><img align="top" src="docs/img/image_planner_waypoints.png" width="350" height="250"/><img align="top" src="docs/img/image_planner_projection.png" width="350" height="250"/> </p>
 
 
-The image planner considers optimal trajectories in a short term horizon within in the image space, removing the need of local cost map generation.
+The image planner considers optimal trajectories in a short term horizon within the image space, removing the reliance on local planning with a cost map.
 
 ## Requirements
 - Ubuntu 20.04 

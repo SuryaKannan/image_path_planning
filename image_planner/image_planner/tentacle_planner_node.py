@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
-import rclpy
-from rclpy.node import Node
-from sensor_msgs.msg import Image, CameraInfo
 import numpy as np
 import ros2_numpy 
-import image_geometry
-from planning_interfaces.msg import WaypointArray, WaypointInfo
+import rclpy
+from rclpy.node import Node
+from image_geometry import PinholeCameraModel
+from sensor_msgs.msg import Image, CameraInfo
 from tf2_msgs.msg import TFMessage
 from image_planner.utils import transforms
-from planning_interfaces.msg import Tentacle
 from geometry_msgs.msg import PoseStamped
+from planning_interfaces.msg import WaypointArray, WaypointInfo, Tentacle
 
 class TentaclePlanner(Node):
     def __init__(self):
@@ -25,7 +24,7 @@ class TentaclePlanner(Node):
         self.image_publisher_ = self.create_publisher(Image, '/waypoint_overlay', 10)
         self.tentacle_publisher_ = self.create_publisher(Tentacle, '/tentacle_selection', 10)
         
-        self.visualise = True
+        self.visualise = False
         self.plan_to_goal = False
         self.IM_HEIGHT = 480
         self.IM_WIDTH = 640
@@ -42,7 +41,7 @@ class TentaclePlanner(Node):
         self.baselnk_2_camera = None
         self.basefootprint_2_odom = None
         
-        self.camera_model = image_geometry.PinholeCameraModel()
+        self.camera_model = PinholeCameraModel()
         self.tentacle = Tentacle()
 
     def tentacle_select(self,measured_depth):
@@ -67,13 +66,13 @@ class TentaclePlanner(Node):
             diff[diff <= self.crit_dist] = 0
             diff = np.reshape(diff,(self.num_trajectories,self.num_samples))
             traj_collisions = diff.sum(axis=1) ## number of collisions per trajectory
-            # traj_collisions = traj_collisions[::-1] ## uncomment for tentacle readability
+            #print(traj_collisions[::-1]) ## uncomment to see collisions per path 
             
             traj_costs = self.points_array[0:2,:]
             traj_costs = np.linalg.norm(base_link_goal_pos[0:2, None]-traj_costs,axis=0)
             traj_costs = np.reshape(traj_costs,(self.num_trajectories,self.num_samples))
             traj_costs = np.sum(traj_costs,axis=1) ## costs of trajectories relative to goal
-            # traj_costs = traj_costs[::-1] ## uncomment for tentacle readability
+            # print(traj_costs[::-1]) ## uncomment to see tentacle costs 
 
             if traj_costs[traj_collisions == 0].shape != 0:
                 safe_trajs = np.min(traj_costs[traj_collisions == 0]) ## safest trajectory with lowest cost
@@ -91,7 +90,6 @@ class TentaclePlanner(Node):
         depth_frame = np.array(depth_frame, dtype=np.float32)
         self.tentacle_select(depth_frame)
             
-
     def image_received(self,msg):
         """
         If Visualisation is set to True, an image is published to the /waypoint_overlay topic where the projected waypoints can be seen.

@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 import numpy as np
+import ros2_numpy 
 import rclpy
 from rclpy.node import Node
-import ros2_numpy 
-from planning_interfaces.msg import WaypointArray, WaypointInfo
 from geometry_msgs.msg import PoseStamped, Twist
 from nav_msgs.msg import Odometry
-from planning_interfaces.msg import Tentacle
-  
+from planning_interfaces.msg import WaypointArray, WaypointInfo, Tentacle
+
 class Controller(Node):
     def __init__(self):
         super().__init__('controller')
