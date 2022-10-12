@@ -25,8 +25,8 @@ class Controller(Node):
         self.goal = np.array([0,0])      
         self.num_trajectories = 0
         self.num_samples = 0
-        self.goal_range = 0.5 
-        self.max_speed = 2
+        self.goal_range = 1.5
+        self.max_speed = 1
         self.slow_dist = 2.5
         self.goal_set = False
         self.motion = Twist()
@@ -79,13 +79,11 @@ class Controller(Node):
     def timer_callback(self):
         if self.goal_set:
             dist_to_goal = np.linalg.norm(self.goal - self.pose)
-
-            print("distance: ",dist_to_goal,"","forward velocity: ",self.calc_vel(dist_to_goal))
-
+            self.get_logger().info("distance: ",dist_to_goal,"","forward velocity: ",self.calc_vel(dist_to_goal))
             if dist_to_goal > self.goal_range:
                 vel = np.float(self.calc_vel(dist_to_goal))
                 self.motion.linear.x = vel
-                self.motion.angular.z =  np.float(self.calc_angular(vel,dist_to_goal))
+                self.motion.angular.z =  self.calc_angular(vel,dist_to_goal)
             else: 
                 print("reached goal!")
                 self.motion.linear.x = 0.0

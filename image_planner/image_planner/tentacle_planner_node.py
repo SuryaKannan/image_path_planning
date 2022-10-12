@@ -66,7 +66,7 @@ class TentaclePlanner(Node):
             diff[diff <= self.crit_dist] = 0
             diff = np.reshape(diff,(self.num_trajectories,self.num_samples))
             traj_collisions = diff.sum(axis=1) ## number of collisions per trajectory
-            #print(traj_collisions[::-1]) ## uncomment to see collisions per path 
+            # print(traj_collisions[::-1]) ## uncomment to see collisions per path 
             
             traj_costs = self.points_array[0:2,:]
             traj_costs = np.linalg.norm(base_link_goal_pos[0:2, None]-traj_costs,axis=0)
