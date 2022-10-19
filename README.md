@@ -7,6 +7,8 @@
 
 The image planner considers optimal trajectories in a short term horizon within the image space, removing the reliance on local planning with a cost map.
 
+For an overview to the project, see this [video](need_a_link).
+
 ## Requirements
 - Ubuntu 20.04 
 - [ROS2 Foxy Fitzroy](https://docs.ros.org/en/foxy/Installation.html) 
@@ -23,7 +25,7 @@ echo "export LINOROBOT2_BASE=4wd" >> ~/.bashrc
 source ~/.bashrc
 ```
 
-## Quick Start
+## Quick Start  
 ### 1) Launch Linorobot2 Gazebo environment
 ```shell
 ros2 launch linorobot2_gazebo gazebo.launch.py
@@ -36,6 +38,7 @@ ros2 launch image_planner image_planner.launch.py rviz:=true
 ```
 
 ### 3) Select a Goal Pose using RVIZ 
+&nbsp;
 
 ## Packages
 
@@ -153,7 +156,7 @@ Maximum speed of the vehicle
 `~slow_dist`<br/>
 Distance at which to start following a parabolic braking profile
 
-
+&nbsp;
 ## Acknowledgements
 
 ### [linorobot2](https://github.com/linorobot/linorobot2)
@@ -161,13 +164,15 @@ Distance at which to start following a parabolic braking profile
 ### [ros2_numpy](https://github.com/Box-Robotics/ros2_numpy/tree/743513e56e3f35aa91ce07799de4b0f2f59f88c0)
 - tools for converting ROS messages to and from numpy arrays for ROS2
 
+&nbsp;
+
 ## Troubleshooting Guide
 
 | Issue  | Solution |
 | ------------- | ------------- |
 | Gazebo simulation isn't launching  | Remove the build, log and install files and re-run colcon build WITHOUT the --symlink-install flag. If you are connected to a LAN with other computers running ROS2, make sure you have a different ROS_DOMAIN_ID. The last thing to try is to use ```$ killall gzserver``` in the event there are background processes still running that haven't exited cleanly|
 | RuntimeWarning: invalid value encountered in double_scalars m = (point2[1]-point1[1])/(np.cosh(point2[0])-np.cosh(point1[0]))  | Ensure the [number of trajectories chosen](/waypoint_generator/waypoint_generator/waypoint_publisher_node.py) is even. If still this warning appears with no visualisable waypoints in RVIZ, re-run the launch file |
-| No Waypoints spawn and no image appears  | Relaunch the image planner launch file. You may need to do this several times. Try to disable Visualisation to help |
+| No waypoints spawn and no image appears  | Relaunch the image planner launch file. You may need to do this a couple of times. Try to disable [visualisation](image_planner/image_planner/tentacle_planner_node.py) to help |
 
 &nbsp;
 
