@@ -24,7 +24,7 @@ class TentaclePlanner(Node):
         self.image_publisher_ = self.create_publisher(Image, '/waypoint_overlay', 10)
         self.tentacle_publisher_ = self.create_publisher(Tentacle, '/tentacle_selection', 10)
         
-        self.visualise = False
+        self.visualise = True
         self.plan_to_goal = False
         self.IM_HEIGHT = 480
         self.IM_WIDTH = 640
@@ -67,6 +67,7 @@ class TentaclePlanner(Node):
             diff = np.reshape(diff,(self.num_trajectories,self.num_samples))
             traj_collisions = diff.sum(axis=1) ## number of collisions per trajectory
             # self.get_logger().info(f'{traj_collisions[::-1]}') ## uncomment to see collisions per path 
+            print(traj_collisions[::-1])
             
             traj_costs = self.points_array[0:2,:]
             traj_costs = np.linalg.norm(base_link_goal_pos[0:2, None]-traj_costs,axis=0)

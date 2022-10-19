@@ -29,7 +29,7 @@ class Controller(Node):
         self.max_speed = 0.5
         self.slow_dist = 2.5
         self.max_angular = 0.7
-        self.min_angular = 0.2
+        self.min_angular = 0.1
         self.goal_set = False
         self.motion = Twist()
         self.tentacle = None
@@ -83,7 +83,7 @@ class Controller(Node):
         
         self.angle_arr.insert(0, angular)
 
-        if len(self.angle_arr) >= 5:
+        if len(self.angle_arr) >= 10:
             self.angle_arr.pop(-1)
 
         return np.average(self.angle_arr)

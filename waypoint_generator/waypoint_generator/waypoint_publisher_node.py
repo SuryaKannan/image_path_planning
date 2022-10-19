@@ -22,12 +22,12 @@ class WaypointPublisher(Node):
         self.IM_HEIGHT = 480 ## see Gazebo camera definition 
         self.IM_WIDTH = 640 
         self.path = "src/image_path_planning/params" ## path to params for notebook visualisation
-        self.num_trajectories = 16 # number of desired trajectories desired 
+        self.num_trajectories = 8 # number of desired trajectories desired 
         self.sampling_points = 10 # desired samples per trajectory 
         self.points_array = np.zeros((self.num_trajectories,self.sampling_points,3))
         self.grid_width = 2 ## width of grid in y direction 
         self.grid_size = (0,0)
-        self.stretch = 6 
+        self.stretch = 5 
         self.offset = 0.41 ## assumed safe distance in front of vehicle that we commence planning on 
         self.base_link_height = 0.0
         self.published = False
