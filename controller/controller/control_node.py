@@ -20,17 +20,20 @@ class Controller(Node):
         self.timer = self.create_timer(timer_period,self.timer_callback)
 
         self.y_dists = None 
-        self.y_arc = 4 ## waypoint from all trajectories to create a radius from
+        self.y_arc = 1 ## waypoint from all trajectories to create a radius from
         self.pose = np.array([0,0])   
         self.goal = np.array([0,0])      
         self.num_trajectories = 0
         self.num_samples = 0
-        self.goal_range = 1.5
-        self.max_speed = 1
+        self.goal_range = 3
+        self.max_speed = 0.5
         self.slow_dist = 2.5
+        self.max_angular = 0.7
+        self.min_angular = 0.1
         self.goal_set = False
         self.motion = Twist()
         self.tentacle = None
+        self.angle_arr = []
 
     def waypoints_received(self,msg):
         '''
@@ -45,8 +48,9 @@ class Controller(Node):
                 mat = ros2_numpy.numpify(waypoint.pose)
                 points_array[index,:] = mat[:-1,-1]
 
-            self.y_dists = np.reshape(points_array[:,1],(self.num_samples,self.num_trajectories))
-            self.y_dists = self.y_dists[self.y_dists.shape[0]-self.y_arc,:]
+            self.y_dists = np.reshape(points_array[:,1],(self.num_trajectories,self.num_samples))
+            self.y_dists = self.y_dists[:,self.y_arc]
+            self.get_logger().info(f'{self.y_dists}')
             self.waypoint_subscriber_.destroy() ## destroy subscription after storing waypoints
     
     def waypoints_info_received(self,msg):
@@ -69,23 +73,33 @@ class Controller(Node):
         else:
             return (self.max_speed/self.slow_dist**2)*(dist**2) ## follow a parabolic velocity curve for braking 
     
-    def calc_angular(self,vel,dist):
+    def calc_angular(self):
+        angular = self.y_dists[self.tentacle]
         
-        return 2*vel*(self.y_dists[self.tentacle]/dist**2) ## generate an angular velocity based on a chosen tentacle
+        if abs(angular) < 0.1:
+            angular = 0
+        else:
+            angular = (self.max_angular/abs(self.y_dists[0]))*angular + np.sign(angular)*self.min_angular
         
+        self.angle_arr.insert(0, angular)
+
+        if len(self.angle_arr) >= 10:
+            self.angle_arr.pop(-1)
+
+        return np.average(self.angle_arr)
+
     def tentacle_received(self,msg):
         self.tentacle = msg.tentacle_id
         
     def timer_callback(self):
-        if self.goal_set:
+        if self.goal_set == True:
             dist_to_goal = np.linalg.norm(self.goal - self.pose)
-            self.get_logger().info("distance: ",dist_to_goal,"","forward velocity: ",self.calc_vel(dist_to_goal))
-            if dist_to_goal > self.goal_range:
+            if (dist_to_goal > self.goal_range) and self.tentacle is not None:
                 vel = np.float(self.calc_vel(dist_to_goal))
                 self.motion.linear.x = vel
-                self.motion.angular.z =  self.calc_angular(vel,dist_to_goal)
+                self.motion.angular.z = float(self.calc_angular())
+                self.get_logger().info(f'w: {self.motion.angular.z}, v: {self.motion.linear.x}')
             else: 
-                print("reached goal!")
                 self.motion.linear.x = 0.0
                 self.motion.angular.z = 0.0
                 self.goal_set = False

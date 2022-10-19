@@ -24,7 +24,7 @@ class TentaclePlanner(Node):
         self.image_publisher_ = self.create_publisher(Image, '/waypoint_overlay', 10)
         self.tentacle_publisher_ = self.create_publisher(Tentacle, '/tentacle_selection', 10)
         
-        self.visualise = False
+        self.visualise = True
         self.plan_to_goal = False
         self.IM_HEIGHT = 480
         self.IM_WIDTH = 640
@@ -66,13 +66,14 @@ class TentaclePlanner(Node):
             diff[diff <= self.crit_dist] = 0
             diff = np.reshape(diff,(self.num_trajectories,self.num_samples))
             traj_collisions = diff.sum(axis=1) ## number of collisions per trajectory
-            # print(traj_collisions[::-1]) ## uncomment to see collisions per path 
+            # self.get_logger().info(f'{traj_collisions[::-1]}') ## uncomment to see collisions per path 
+            print(traj_collisions[::-1])
             
             traj_costs = self.points_array[0:2,:]
             traj_costs = np.linalg.norm(base_link_goal_pos[0:2, None]-traj_costs,axis=0)
             traj_costs = np.reshape(traj_costs,(self.num_trajectories,self.num_samples))
             traj_costs = np.sum(traj_costs,axis=1) ## costs of trajectories relative to goal
-            # print(traj_costs[::-1]) ## uncomment to see tentacle costs 
+            # self.get_logger().info(f'{traj_costs[::-1]}')  ## uncomment to see tentacle costs 
 
             if traj_costs[traj_collisions == 0].shape != 0:
                 safe_trajs = np.min(traj_costs[traj_collisions == 0]) ## safest trajectory with lowest cost
@@ -96,7 +97,7 @@ class TentaclePlanner(Node):
         """
         if self.visualise is True and self.camera_traj_pixels is not None:
             current_frame = ros2_numpy.numpify(msg)
-            current_frame[self.camera_traj_pixels[1,:],self.camera_traj_pixels[0,:],:] = np.array([255,255,255]) ## white projected waypoint pixels
+            current_frame[self.camera_traj_pixels[1,:],self.camera_traj_pixels[0,:],:] = np.array([255,0,0]) ## white projected waypoint pixels
             img = ros2_numpy.msgify(Image, current_frame,encoding="rgb8")
             self.image_publisher_.publish(img)
 
